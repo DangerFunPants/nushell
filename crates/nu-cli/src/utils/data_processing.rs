@@ -1,7 +1,7 @@
 use crate::data::value::compare_values;
 use crate::data::TaggedListBuilder;
 use chrono::{DateTime, NaiveDate, Utc};
-use nu_errors::ShellError;
+use nu_errors::{ShellError};
 use nu_protocol::hir::Operator;
 use nu_protocol::{Primitive, TaggedDictBuilder, UntaggedValue, Value};
 use nu_source::{SpannedItem, Tag, Tagged, TaggedItem};
@@ -200,16 +200,18 @@ pub fn evaluate(
 pub fn sum(data: Vec<Value>) -> Result<Value, ShellError> {
     let mut acc = Value::zero();
     for value in data {
-        match value.value {
-            UntaggedValue::Primitive(_) => acc = acc + value,
-            _ => {
-                return Err(ShellError::labeled_error(
-                    "Attempted to compute the sum of a value that cannot be summed.",
-                    "value appears here",
-                    value.tag.span,
-                ))
-            }
+        let tag = value.tag.clone();
+        let result = acc + value;
+        if let UntaggedValue::Primitive(_) = result.value {
+            acc = result;
+        } else {
+            return Err(ShellError::labeled_error(
+                "Attempted to compute the sum of a value that cannot be summed.",
+                "value appears here",
+                tag.span
+                ));
         }
+
     }
     Ok(acc)
 }

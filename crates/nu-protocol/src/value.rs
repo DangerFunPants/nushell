@@ -15,13 +15,14 @@ use crate::value::dict::Dictionary;
 use crate::value::iter::{RowValueIter, TableValueIter};
 use crate::value::primitive::Primitive;
 use crate::value::range::{Range, RangeInclusion};
+use crate::hir::Operator;
 use crate::{ColumnPath, PathMember, UnspannedPathMember};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use nu_errors::ShellError;
-use nu_source::{AnchorLocation, HasSpan, Span, Spanned, Tag};
+use nu_source::{AnchorLocation, HasSpan, Span, Spanned, Tag, SpannedItem};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
@@ -523,16 +524,12 @@ impl std::ops::Add for Value {
 
     fn add(self, rhs: Self) -> Self {
         let tag = self.tag.clone();
-
-        match (&*self, &*rhs) {
-            (UntaggedValue::Primitive(left), UntaggedValue::Primitive(right)) => {
-                let left = left.clone();
-                let right = right.clone();
-
-                UntaggedValue::from(left.add(right)).into_value(tag)
-            }
-            (_, _) => UntaggedValue::Error(ShellError::unimplemented("Can't add non-primitives."))
-                .into_value(tag),
+        
+        match compute_values(Operator::Plus, &self, &rhs) {
+            Ok(result) => result.into_value(tag),
+            Err((left_type, right_type)) => UntaggedValue::Error(ShellError::type_error(
+                    left_type, right_type.spanned_unknown()
+                    )).into_value(tag),
         }
     }
 }
@@ -557,3 +554,96 @@ pub fn merge_descriptors(values: &[Value]) -> Vec<String> {
     }
     ret
 }
+
+pub fn compute_values(
+    operator: Operator,
+    left: &UntaggedValue,
+    right: &UntaggedValue,
+) -> Result<UntaggedValue, (&'static str, &'static str)> {
+    match (left, right) {
+        (UntaggedValue::Primitive(lhs), UntaggedValue::Primitive(rhs)) => match (lhs, rhs) {
+            (Primitive::Bytes(x), Primitive::Bytes(y)) => {
+                let result = match operator {
+                    Operator::Plus => Ok(x + y),
+                    Operator::Minus => Ok(x - y),
+                    _ => Err((left.type_name(), right.type_name())),
+                }?;
+                Ok(UntaggedValue::Primitive(Primitive::Bytes(result)))
+            }
+            (Primitive::Int(x), Primitive::Int(y)) => match operator {
+                Operator::Plus => Ok(UntaggedValue::Primitive(Primitive::Int(x + y))),
+                Operator::Minus => Ok(UntaggedValue::Primitive(Primitive::Int(x - y))),
+                Operator::Multiply => Ok(UntaggedValue::Primitive(Primitive::Int(x * y))),
+                Operator::Divide => {
+                    if x - (y * (x / y)) == num_bigint::BigInt::from(0) {
+                        Ok(UntaggedValue::Primitive(Primitive::Int(x / y)))
+                    } else {
+                        Ok(UntaggedValue::Primitive(Primitive::Decimal(
+                            bigdecimal::BigDecimal::from(x.clone())
+                                / bigdecimal::BigDecimal::from(y.clone()),
+                        )))
+                    }
+                }
+                _ => Err((left.type_name(), right.type_name())),
+            },
+            (Primitive::Decimal(x), Primitive::Int(y)) => {
+                let result = match operator {
+                    Operator::Plus => Ok(x + bigdecimal::BigDecimal::from(y.clone())),
+                    Operator::Minus => Ok(x - bigdecimal::BigDecimal::from(y.clone())),
+                    Operator::Multiply => Ok(x * bigdecimal::BigDecimal::from(y.clone())),
+                    Operator::Divide => Ok(x / bigdecimal::BigDecimal::from(y.clone())),
+                    _ => Err((left.type_name(), right.type_name())),
+                }?;
+                Ok(UntaggedValue::Primitive(Primitive::Decimal(result)))
+            }
+            (Primitive::Int(x), Primitive::Decimal(y)) => {
+                let result = match operator {
+                    Operator::Plus => Ok(bigdecimal::BigDecimal::from(x.clone()) + y),
+                    Operator::Minus => Ok(bigdecimal::BigDecimal::from(x.clone()) - y),
+                    Operator::Multiply => Ok(bigdecimal::BigDecimal::from(x.clone()) * y),
+                    Operator::Divide => Ok(bigdecimal::BigDecimal::from(x.clone()) / y),
+                    _ => Err((left.type_name(), right.type_name())),
+                }?;
+                Ok(UntaggedValue::Primitive(Primitive::Decimal(result)))
+            }
+            (Primitive::Decimal(x), Primitive::Decimal(y)) => {
+                let result = match operator {
+                    Operator::Plus => Ok(x + y),
+                    Operator::Minus => Ok(x - y),
+                    Operator::Multiply => Ok(x * y),
+                    Operator::Divide => Ok(x / y),
+                    _ => Err((left.type_name(), right.type_name())),
+                }?;
+                Ok(UntaggedValue::Primitive(Primitive::Decimal(result)))
+            }
+            (Primitive::Date(x), Primitive::Date(y)) => {
+                let result = match operator {
+                    Operator::Minus => Ok(x.signed_duration_since(*y).num_seconds()),
+                    _ => Err((left.type_name(), right.type_name())),
+                }?;
+                Ok(UntaggedValue::Primitive(Primitive::Duration(result)))
+            }
+            (Primitive::Date(x), Primitive::Duration(y)) => {
+                let result = match operator {
+                    Operator::Plus => Ok(x
+                        .checked_add_signed(chrono::Duration::seconds(*y as i64))
+                        .expect("Overflowing add of duration")),
+                    _ => Err((left.type_name(), right.type_name())),
+                }?;
+                Ok(UntaggedValue::Primitive(Primitive::Date(result)))
+            }
+            (Primitive::Duration(x), Primitive::Duration(y)) => {
+                let result = match operator {
+                    Operator::Plus => Ok(x + y),
+                    Operator::Minus => Ok(x - y),
+                    _ => Err((left.type_name(), right.type_name())),
+                }?;
+
+                Ok(UntaggedValue::Primitive(Primitive::Duration(result)))
+            }
+            _ => Err((left.type_name(), right.type_name())),
+        },
+        _ => Err((left.type_name(), right.type_name())),
+    }
+}
+

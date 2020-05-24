@@ -1,6 +1,6 @@
 use crate::data::value;
 use nu_protocol::hir::Operator;
-use nu_protocol::{Primitive, ShellTypeName, UntaggedValue, Value};
+use nu_protocol::{Primitive, ShellTypeName, UntaggedValue, Value, compute_values};
 use std::ops::Not;
 
 pub fn apply_operator(
@@ -21,10 +21,10 @@ pub fn apply_operator(
         Operator::NotContains => string_contains(left, right)
             .map(Not::not)
             .map(UntaggedValue::boolean),
-        Operator::Plus => value::compute_values(op, left, right),
-        Operator::Minus => value::compute_values(op, left, right),
-        Operator::Multiply => value::compute_values(op, left, right),
-        Operator::Divide => value::compute_values(op, left, right),
+        Operator::Plus => compute_values(op, left, right),
+        Operator::Minus => compute_values(op, left, right),
+        Operator::Multiply => compute_values(op, left, right),
+        Operator::Divide => compute_values(op, left, right),
         Operator::In => table_contains(left, right).map(UntaggedValue::boolean),
         Operator::NotIn => table_contains(left, right).map(|x| UntaggedValue::boolean(!x)),
         Operator::And => match (left.as_bool(), right.as_bool()) {
