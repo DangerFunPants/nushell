@@ -58,7 +58,9 @@ fn outputs_zero_with_no_input() {
             "#
         ));
 
-        assert!(actual.err.contains("Attempted to compute the sum of a value that cannot be summed."));
+        assert!(actual
+            .err
+            .contains("Attempted to compute the sum of a value that cannot be summed."));
     })
 }
 
