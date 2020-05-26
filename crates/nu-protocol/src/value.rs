@@ -10,19 +10,19 @@ mod serde_bigdecimal;
 mod serde_bigint;
 
 use crate::hir;
+use crate::hir::Operator;
 use crate::type_name::{ShellTypeName, SpannedTypeName};
 use crate::value::dict::Dictionary;
 use crate::value::iter::{RowValueIter, TableValueIter};
 use crate::value::primitive::Primitive;
 use crate::value::range::{Range, RangeInclusion};
-use crate::hir::Operator;
 use crate::{ColumnPath, PathMember, UnspannedPathMember};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use nu_errors::ShellError;
-use nu_source::{AnchorLocation, HasSpan, Span, Spanned, Tag, SpannedItem};
+use nu_source::{AnchorLocation, HasSpan, Span, Spanned, SpannedItem, Tag};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
@@ -524,12 +524,14 @@ impl std::ops::Add for Value {
 
     fn add(self, rhs: Self) -> Self {
         let tag = self.tag.clone();
-        
+
         match compute_values(Operator::Plus, &self, &rhs) {
             Ok(result) => result.into_value(tag),
             Err((left_type, right_type)) => UntaggedValue::Error(ShellError::type_error(
-                    left_type, right_type.spanned_unknown()
-                    )).into_value(tag),
+                left_type,
+                right_type.spanned_unknown(),
+            ))
+            .into_value(tag),
         }
     }
 }
@@ -646,4 +648,3 @@ pub fn compute_values(
         _ => Err((left.type_name(), right.type_name())),
     }
 }
-

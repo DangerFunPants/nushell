@@ -13,7 +13,7 @@ extern crate quickcheck;
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
 
-pub mod cli;
+mod cli;
 mod commands;
 mod context;
 mod data;

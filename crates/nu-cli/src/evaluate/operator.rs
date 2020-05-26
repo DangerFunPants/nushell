@@ -1,6 +1,6 @@
 use crate::data::value;
 use nu_protocol::hir::Operator;
-use nu_protocol::{Primitive, ShellTypeName, UntaggedValue, Value, compute_values};
+use nu_protocol::{compute_values, Primitive, ShellTypeName, UntaggedValue, Value};
 use std::ops::Not;
 
 pub fn apply_operator(

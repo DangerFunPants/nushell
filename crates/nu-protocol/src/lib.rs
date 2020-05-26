@@ -24,4 +24,4 @@ pub use crate::value::evaluate::Scope;
 pub use crate::value::primitive::Primitive;
 pub use crate::value::primitive::{format_date, format_duration, format_primitive};
 pub use crate::value::range::{Range, RangeInclusion};
-pub use crate::value::{merge_descriptors, UntaggedValue, Value, compute_values};
+pub use crate::value::{compute_values, merge_descriptors, UntaggedValue, Value};

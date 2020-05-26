@@ -1,7 +1,7 @@
 use crate::data::value::compare_values;
 use crate::data::TaggedListBuilder;
 use chrono::{DateTime, NaiveDate, Utc};
-use nu_errors::{ShellError};
+use nu_errors::ShellError;
 use nu_protocol::hir::Operator;
 use nu_protocol::{Primitive, TaggedDictBuilder, UntaggedValue, Value};
 use nu_source::{SpannedItem, Tag, Tagged, TaggedItem};
@@ -208,10 +208,9 @@ pub fn sum(data: Vec<Value>) -> Result<Value, ShellError> {
             return Err(ShellError::labeled_error(
                 "Attempted to compute the sum of a value that cannot be summed.",
                 "value appears here",
-                tag.span
-                ));
+                tag.span,
+            ));
         }
-
     }
     Ok(acc)
 }
