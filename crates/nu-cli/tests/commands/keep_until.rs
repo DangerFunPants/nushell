@@ -37,10 +37,11 @@ fn condition_is_met() {
                 | skip 2
                 | split column ','
                 | headers
-                | skip-while "Chickens Collction" != "Blue Chickens"
+                | skip-while "Chicken Collection" != "Blue Chickens"
                 | keep-until "Chicken Collection" == "Red Chickens"
                 | str "31/04/2020" --to-int
                 | get "31/04/2020"
+                | skip 1
                 | sum
                 | echo $it
                 "#

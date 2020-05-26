@@ -58,7 +58,7 @@ fn outputs_zero_with_no_input() {
             "#
         ));
 
-        assert_eq!(actual.out, "0");
+        assert!(actual.err.contains("Attempted to compute the sum of a value that cannot be summed."));
     })
 }
 
